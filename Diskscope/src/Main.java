@@ -5,242 +5,293 @@ import com.diskscope.ui.DashboardPanel;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class Main extends JFrame {
 
-    private final Color BACKGROUND = new Color(17, 17, 19);
-    private final Color SIDEBAR = new Color(23, 23, 26);
-    private final Color PANEL = new Color(30, 30, 34);
-    private final Color TEXT = new Color(240, 240, 242);
-    private final Color MUTED = new Color(150, 150, 158);
+    private static final Color BACKGROUND = new Color(15, 17, 21);
+    private static final Color SIDEBAR = new Color(20, 22, 27);
+    private static final Color PANEL = new Color(26, 29, 35);
+    private static final Color PANEL_LIGHT = new Color(32, 36, 43);
+    private static final Color ACCENT = new Color(70, 130, 220);
+    private static final Color TEXT = new Color(235, 238, 243);
+    private static final Color MUTED = new Color(145, 152, 163);
 
-    private JPanel contentPanel;
-    private JLabel pageTitle;
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel contentPanel = new JPanel(cardLayout);
 
-    private DashboardPanel dashboardPanel;
+    private final JButton[] navigationButtons = new JButton[8];
+    private JButton activeButton;
+
+    private final String[] pageNames = {
+            "Dashboard",
+            "Drive Analyzer",
+            "Large Files",
+            "Duplicate Finder",
+            "Storage Breakdown",
+            "Scan History",
+            "Reports",
+            "Settings"
+    };
 
     public Main() {
-
         setTitle("DiskScope - Storage Analyzer");
-        setSize(1250, 780);
-        setMinimumSize(new Dimension(1050, 650));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1250, 800);
+        setMinimumSize(new Dimension(1050, 680));
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
-
         getContentPane().setBackground(BACKGROUND);
 
         createSidebar();
-        createMainContent();
+        createMainArea();
 
-        showPage("Dashboard");
-
+        showPage("Dashboard", 0);
     }
 
     private void createSidebar() {
-
         JPanel sidebar = new JPanel();
-        sidebar.setPreferredSize(new Dimension(230, 0));
+        sidebar.setPreferredSize(new Dimension(235, 0));
         sidebar.setBackground(SIDEBAR);
-        sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
-        sidebar.setBorder(new EmptyBorder(25, 15, 20, 15));
+        sidebar.setLayout(new BorderLayout());
 
-        JLabel logo = new JLabel("  DiskScope");
-        logo.setFont(new Font("SansSerif", Font.BOLD, 23));
+        JPanel topPanel = new JPanel();
+        topPanel.setOpaque(false);
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+        topPanel.setBorder(new EmptyBorder(28, 20, 20, 20));
+
+        JLabel logo = new JLabel("DiskScope");
+        logo.setFont(new Font("Segoe UI", Font.BOLD, 25));
         logo.setForeground(TEXT);
         logo.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("  STORAGE ANALYZER");
-        subtitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        JLabel subtitle = new JLabel("STORAGE ANALYZER");
+        subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         subtitle.setForeground(MUTED);
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        sidebar.add(logo);
-        sidebar.add(Box.createVerticalStrut(5));
-        sidebar.add(subtitle);
-        sidebar.add(Box.createVerticalStrut(40));
+        topPanel.add(logo);
+        topPanel.add(Box.createVerticalStrut(5));
+        topPanel.add(subtitle);
+        topPanel.add(Box.createVerticalStrut(35));
 
-        addSectionLabel(sidebar, "WORKSPACE");
+        JLabel navigationLabel = new JLabel("WORKSPACE");
+        navigationLabel.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        navigationLabel.setForeground(MUTED);
+        navigationLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        addNavigationButton(sidebar, "Dashboard");
-        addNavigationButton(sidebar, "Drive Analyzer");
-        addNavigationButton(sidebar, "Large Files");
-        addNavigationButton(sidebar, "Duplicate Finder");
+        topPanel.add(navigationLabel);
+        topPanel.add(Box.createVerticalStrut(12));
 
-        sidebar.add(Box.createVerticalStrut(25));
+        for (int i = 0; i < pageNames.length; i++) {
+            final int index = i;
+            JButton button = createNavigationButton(pageNames[i]);
 
-        addSectionLabel(sidebar, "MANAGEMENT");
+            navigationButtons[i] = button;
+            button.setAlignmentX(Component.LEFT_ALIGNMENT);
+            button.addActionListener(e -> showPage(pageNames[index], index));
 
-        addNavigationButton(sidebar, "Reports");
-        addNavigationButton(sidebar, "Scan History");
+            topPanel.add(button);
+            topPanel.add(Box.createVerticalStrut(6));
+        }
 
-        sidebar.add(Box.createVerticalGlue());
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
+        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
+        bottomPanel.setBorder(new EmptyBorder(15, 20, 22, 20));
 
-        JLabel version = new JLabel("DiskScope v1.0.0");
+        JSeparator separator = new JSeparator();
+        separator.setForeground(PANEL_LIGHT);
+        separator.setBackground(PANEL_LIGHT);
+
+        JLabel version = new JLabel("DiskScope v2.0");
+        version.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         version.setForeground(MUTED);
-        version.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        version.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        sidebar.add(version);
+        bottomPanel.add(separator);
+        bottomPanel.add(Box.createVerticalStrut(15));
+        bottomPanel.add(version);
+
+        sidebar.add(topPanel, BorderLayout.NORTH);
+        sidebar.add(bottomPanel, BorderLayout.SOUTH);
 
         add(sidebar, BorderLayout.WEST);
-
     }
 
-    private void addSectionLabel(JPanel sidebar, String text) {
+    private JButton createNavigationButton(String text) {
+        JButton button = new JButton(text);
 
-        JLabel label = new JLabel(text);
-        label.setForeground(MUTED);
-        label.setFont(new Font("SansSerif", Font.BOLD, 10));
-        label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        label.setBorder(new EmptyBorder(0, 8, 12, 0));
-
-        sidebar.add(label);
-
-    }
-
-    private void addNavigationButton(JPanel sidebar, String name) {
-
-        JButton button = new JButton(name);
-
-        button.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        button.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         button.setForeground(MUTED);
         button.setBackground(SIDEBAR);
         button.setHorizontalAlignment(SwingConstants.LEFT);
         button.setFocusPainted(false);
-        button.setBorder(new EmptyBorder(12, 12, 12, 8));
+        button.setBorder(new EmptyBorder(12, 14, 12, 10));
+        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 43));
-        button.setAlignmentX(Component.LEFT_ALIGNMENT);
-        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        button.setPreferredSize(new Dimension(195, 43));
 
-        button.addActionListener(e -> showPage(name));
-
-        button.addMouseListener(new java.awt.event.MouseAdapter() {
-
+        button.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                button.setBackground(PANEL);
-                button.setForeground(TEXT);
+            public void mouseEntered(MouseEvent e) {
+                if (button != activeButton) {
+                    button.setBackground(PANEL_LIGHT);
+                }
             }
 
             @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                button.setBackground(SIDEBAR);
-                button.setForeground(MUTED);
+            public void mouseExited(MouseEvent e) {
+                if (button != activeButton) {
+                    button.setBackground(SIDEBAR);
+                }
             }
-
         });
 
-        sidebar.add(button);
-        sidebar.add(Box.createVerticalStrut(4));
-
+        return button;
     }
 
-    private void createMainContent() {
-
-        JPanel main = new JPanel(new BorderLayout());
-        main.setBackground(BACKGROUND);
+    private void createMainArea() {
+        JPanel mainArea = new JPanel(new BorderLayout());
+        mainArea.setBackground(BACKGROUND);
 
         JPanel header = new JPanel(new BorderLayout());
         header.setBackground(BACKGROUND);
-        header.setBorder(new EmptyBorder(25, 30, 20, 30));
+        header.setBorder(new EmptyBorder(22, 30, 18, 30));
 
-        pageTitle = new JLabel("Dashboard");
+        JLabel pageTitle = new JLabel("Storage Overview");
+        pageTitle.setFont(new Font("Segoe UI", Font.BOLD, 22));
         pageTitle.setForeground(TEXT);
-        pageTitle.setFont(new Font("SansSerif", Font.BOLD, 25));
 
-        JLabel headerSubtitle = new JLabel(
-            "Monitor and analyze your storage"
-        );
+        JLabel status = new JLabel("● SYSTEM MONITORING");
+        status.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        status.setForeground(new Color(80, 190, 130));
 
-        headerSubtitle.setForeground(MUTED);
-        headerSubtitle.setFont(new Font("SansSerif", Font.PLAIN, 12));
-
-        JPanel titlePanel = new JPanel();
-        titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
-        titlePanel.setBackground(BACKGROUND);
-
-        titlePanel.add(pageTitle);
-        titlePanel.add(Box.createVerticalStrut(5));
-        titlePanel.add(headerSubtitle);
-
-        JLabel status = new JLabel("● SYSTEM READY");
-        status.setForeground(new Color(100, 200, 140));
-        status.setFont(new Font("SansSerif", Font.BOLD, 11));
-
-        header.add(titlePanel, BorderLayout.WEST);
+        header.add(pageTitle, BorderLayout.WEST);
         header.add(status, BorderLayout.EAST);
 
-        contentPanel = new JPanel(new BorderLayout());
         contentPanel.setBackground(BACKGROUND);
-        contentPanel.setBorder(new EmptyBorder(5, 30, 25, 30));
 
-        main.add(header, BorderLayout.NORTH);
-        main.add(contentPanel, BorderLayout.CENTER);
+        // Existing dashboard
+        contentPanel.add(new DashboardPanel(), "Dashboard");
 
-        add(main, BorderLayout.CENTER);
+        // Other navigation pages
+        addPlaceholder(
+                "Drive Analyzer",
+                "Explore connected drives and inspect their storage details.",
+                "Drive analysis tools will be added in the next development stage."
+        );
 
+        addPlaceholder(
+                "Large Files",
+                "Find files that consume significant storage space.",
+                "Large file scanning will be added in the next development stage."
+        );
+
+        addPlaceholder(
+                "Duplicate Finder",
+                "Identify duplicate files to help organize your storage.",
+                "Duplicate detection will be added in the next development stage."
+        );
+
+        addPlaceholder(
+                "Storage Breakdown",
+                "Understand how storage space is distributed across folders.",
+                "Folder storage analysis will be added in the next development stage."
+        );
+
+        addPlaceholder(
+                "Scan History",
+                "Review previous storage scans and their results.",
+                "Scan history will be added in the next development stage."
+        );
+
+        addPlaceholder(
+                "Reports",
+                "View and export storage analysis reports.",
+                "Report generation will be added in the next development stage."
+        );
+
+        addPlaceholder(
+                "Settings",
+                "Customize DiskScope and manage application preferences.",
+                "Application settings will be added in the next development stage."
+        );
+
+        mainArea.add(header, BorderLayout.NORTH);
+        mainArea.add(contentPanel, BorderLayout.CENTER);
+
+        add(mainArea, BorderLayout.CENTER);
     }
 
-    private void showPage(String page) {
+    private void addPlaceholder(String name, String description, String message) {
+        JPanel page = new JPanel(new GridBagLayout());
+        page.setBackground(BACKGROUND);
 
-        pageTitle.setText(page);
-        contentPanel.removeAll();
+        JPanel card = new JPanel();
+        card.setBackground(PANEL);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(new EmptyBorder(35, 40, 35, 40));
 
-        if (page.equals("Dashboard")) {
+        JLabel title = new JLabel(name);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 23));
+        title.setForeground(TEXT);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-            if (dashboardPanel == null) {
-                dashboardPanel = new DashboardPanel();
+        JLabel details = new JLabel(description);
+        details.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        details.setForeground(MUTED);
+        details.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel comingSoon = new JLabel("COMING SOON");
+        comingSoon.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        comingSoon.setForeground(ACCENT);
+        comingSoon.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel information = new JLabel(message);
+        information.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        information.setForeground(MUTED);
+        information.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        card.add(title);
+        card.add(Box.createVerticalStrut(12));
+        card.add(details);
+        card.add(Box.createVerticalStrut(30));
+        card.add(comingSoon);
+        card.add(Box.createVerticalStrut(10));
+        card.add(information);
+
+        page.add(card);
+        contentPanel.add(page, name);
+    }
+
+    private void showPage(String pageName, int buttonIndex) {
+        cardLayout.show(contentPanel, pageName);
+        activeButton = navigationButtons[buttonIndex];
+
+        for (JButton button : navigationButtons) {
+            if (button != null) {
+                button.setBackground(SIDEBAR);
+                button.setForeground(MUTED);
             }
-
-            contentPanel.add(
-                dashboardPanel,
-                BorderLayout.CENTER
-            );
-
-        } else {
-
-            JPanel placeholder = new JPanel(new GridBagLayout());
-            placeholder.setBackground(BACKGROUND);
-
-            JLabel message = new JLabel(page + " - Coming Soon");
-            message.setForeground(MUTED);
-            message.setFont(new Font("SansSerif", Font.PLAIN, 18));
-
-            placeholder.add(message);
-
-            contentPanel.add(
-                placeholder,
-                BorderLayout.CENTER
-            );
-
         }
 
-        contentPanel.revalidate();
-        contentPanel.repaint();
-
+        activeButton.setBackground(PANEL_LIGHT);
+        activeButton.setForeground(TEXT);
     }
 
     public static void main(String[] args) {
-
         SwingUtilities.invokeLater(() -> {
-
             try {
-
                 UIManager.setLookAndFeel(
-                    UIManager.getSystemLookAndFeelClassName()
+                        UIManager.getSystemLookAndFeelClassName()
                 );
-
             } catch (Exception e) {
-
                 e.printStackTrace();
-
             }
 
-            new Main().setVisible(true);
-
+            Main app = new Main();
+            app.setVisible(true);
         });
-
     }
-
 }
