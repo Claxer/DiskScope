@@ -1,3 +1,4 @@
+
 package com.diskscope.ui;
 
 import com.diskscope.analysis.*;
@@ -6,15 +7,22 @@ import com.diskscope.utils.FormatUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+import javax.swing.RowFilter;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class WorkspacePanel extends JPanel {
@@ -62,7 +70,7 @@ public class WorkspacePanel extends JPanel {
                 "Large Files",
                 createScanPage(
                         "Largest Files Finder",
-                        "Find the largest files inside a selected folder.",
+                        "Find, search, sort, and export the largest files inside a selected folder.",
                         Mode.LARGE
                 )
         );
@@ -141,6 +149,69 @@ public class WorkspacePanel extends JPanel {
 
         styleTable(table);
 
+        TableRowSorter<DefaultTableModel> sorter =
+                new TableRowSorter<>(model);
+
+        table.setRowSorter(sorter);
+
+        // Sort file sizes numerically in the Large Files tab.
+        if (mode == Mode.LARGE) {
+            sorter.setComparator(
+                    1,
+                    Comparator.comparingLong(
+                            this::parseFormattedBytes
+                    )
+            );
+        }
+
+        AtomicReference<List<FileRecord>> latestRecords =
+                new AtomicReference<>(List.of());
+
+        JTextField searchField =
+                new JTextField(20);
+
+        searchField.setToolTipText(
+                "Search by file name, extension, or location"
+        );
+
+        styleField(searchField);
+
+        searchField.getDocument().addDocumentListener(
+                new DocumentListener() {
+
+                    private void filterTable() {
+
+                        String query =
+                                searchField.getText().trim();
+
+                        if (query.isEmpty()) {
+                            sorter.setRowFilter(null);
+                        } else {
+                            sorter.setRowFilter(
+                                    RowFilter.regexFilter(
+                                            "(?i)" + Pattern.quote(query)
+                                    )
+                            );
+                        }
+                    }
+
+                    @Override
+                    public void insertUpdate(DocumentEvent e) {
+                        filterTable();
+                    }
+
+                    @Override
+                    public void removeUpdate(DocumentEvent e) {
+                        filterTable();
+                    }
+
+                    @Override
+                    public void changedUpdate(DocumentEvent e) {
+                        filterTable();
+                    }
+                }
+        );
+
         JScrollPane tableScroll =
                 new JScrollPane(table);
 
@@ -172,6 +243,181 @@ public class WorkspacePanel extends JPanel {
         page.add(Box.createVerticalStrut(5));
         page.add(summary);
         page.add(Box.createVerticalStrut(12));
+
+        // Large Files toolbar.
+        if (mode == Mode.LARGE) {
+
+            JPanel toolbar =
+                    new JPanel(new BorderLayout(8, 0));
+
+            toolbar.setBackground(Theme.BACKGROUND);
+
+            JLabel searchLabel =
+                    subtitle("Search files:");
+
+            JPanel searchPanel =
+                    new JPanel(new BorderLayout(8, 0));
+
+            searchPanel.setBackground(Theme.BACKGROUND);
+            searchPanel.add(searchLabel, BorderLayout.WEST);
+            searchPanel.add(searchField, BorderLayout.CENTER);
+
+            JButton openLocation =
+                    button("Open Location");
+
+            JButton exportResults =
+                    button("Export Results");
+
+            JPanel toolActions =
+                    new JPanel(
+                            new FlowLayout(FlowLayout.RIGHT, 8, 0)
+                    );
+
+            toolActions.setBackground(Theme.BACKGROUND);
+            toolActions.add(openLocation);
+            toolActions.add(exportResults);
+
+            toolbar.add(searchPanel, BorderLayout.CENTER);
+            toolbar.add(toolActions, BorderLayout.EAST);
+
+            page.add(toolbar);
+            page.add(Box.createVerticalStrut(12));
+
+            // Open the selected file's containing folder.
+            openLocation.addActionListener(e -> {
+
+                int selectedRow =
+                        table.getSelectedRow();
+
+                if (selectedRow < 0) {
+                    error("Select a file from the table first.");
+                    return;
+                }
+
+                int modelRow =
+                        table.convertRowIndexToModel(selectedRow);
+
+                String filePath =
+                        String.valueOf(model.getValueAt(modelRow, 3));
+
+                try {
+
+                    Path file =
+                            Path.of(filePath);
+
+                    Path parent =
+                            file.getParent();
+
+                    if (parent == null || !Files.exists(parent)) {
+                        error("The file location could not be found.");
+                        return;
+                    }
+
+                    if (prefs.getBoolean("confirmOpen", true)) {
+
+                        int choice = JOptionPane.showConfirmDialog(
+                                this,
+                                "Open this file location?\n\n" + parent,
+                                "Open File Location",
+                                JOptionPane.YES_NO_OPTION
+                        );
+
+                        if (choice != JOptionPane.YES_OPTION) {
+                            return;
+                        }
+                    }
+
+                    if (!Desktop.isDesktopSupported()) {
+                        error("Opening file locations is not supported on this system.");
+                        return;
+                    }
+
+                    Desktop.getDesktop().open(parent.toFile());
+
+                } catch (Exception ex) {
+
+                    error(
+                            "Could not open file location: "
+                                    + ex.getMessage()
+                    );
+                }
+            });
+
+            // Export the current Large Files results to CSV.
+            exportResults.addActionListener(e -> {
+
+                List<FileRecord> records =
+                        latestRecords.get();
+
+                if (records.isEmpty()) {
+                    error("Scan a folder before exporting results.");
+                    return;
+                }
+
+                JFileChooser chooser =
+                        new JFileChooser();
+
+                chooser.setDialogTitle("Export Large Files");
+
+                chooser.setSelectedFile(
+                        new File("DiskScope-Large-Files.csv")
+                );
+
+                if (chooser.showSaveDialog(this)
+                        != JFileChooser.APPROVE_OPTION) {
+                    return;
+                }
+
+                Path destination =
+                        chooser.getSelectedFile().toPath();
+
+                try (
+                        BufferedWriter writer =
+                                Files.newBufferedWriter(
+                                        destination,
+                                        StandardCharsets.UTF_8
+                                )
+                ) {
+
+                    writer.write(
+                            "File Name,Extension,Size (Bytes),Location"
+                    );
+
+                    writer.newLine();
+
+                    for (FileRecord record : records) {
+
+                        writer.write(
+                                csv(record.fileName())
+                                        + ","
+                                        + csv(record.extension())
+                                        + ","
+                                        + record.size()
+                                        + ","
+                                        + csv(record.path().toString())
+                        );
+
+                        writer.newLine();
+                    }
+
+                    JOptionPane.showMessageDialog(
+                            this,
+                            "Large Files results exported successfully.\n\n"
+                                    + destination,
+                            "DiskScope",
+                            JOptionPane.INFORMATION_MESSAGE
+                    );
+
+                } catch (IOException ex) {
+
+                    error(
+                            "Could not export results: "
+                                    + ex.getMessage()
+                    );
+                }
+            });
+        }
+
         page.add(tableScroll);
 
         browse.addActionListener(e -> {
@@ -204,7 +450,9 @@ public class WorkspacePanel extends JPanel {
                 return;
             }
 
-            if (!Files.isDirectory(selected)) {
+            if (!Files.isDirectory(selected)
+                    || !Files.isReadable(selected)) {
+
                 error("The selected path is not an accessible folder.");
                 return;
             }
@@ -220,6 +468,7 @@ public class WorkspacePanel extends JPanel {
 
             summary.setText("");
             model.setRowCount(0);
+            latestRecords.set(List.of());
 
             new SwingWorker<List<FileRecord>, Void>() {
 
@@ -256,6 +505,11 @@ public class WorkspacePanel extends JPanel {
                         if (mode == Mode.LARGE) {
 
                             shown = records.stream()
+                                    .sorted(
+                                            Comparator.comparingLong(
+                                                    FileRecord::size
+                                            ).reversed()
+                                    )
                                     .limit(100)
                                     .toList();
                         }
@@ -279,6 +533,9 @@ public class WorkspacePanel extends JPanel {
                                     )
                                     .toList();
                         }
+
+                        // Store the actual displayed results for export.
+                        latestRecords.set(List.copyOf(shown));
 
                         if (mode == Mode.BREAKDOWN) {
 
@@ -418,6 +675,61 @@ public class WorkspacePanel extends JPanel {
         });
 
         return page;
+    }
+
+    private long parseFormattedBytes(String value) {
+
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+
+        try {
+
+            String cleaned =
+                    value.trim().toUpperCase(Locale.ROOT);
+
+            String number =
+                    cleaned.replaceAll("[^0-9.]", "");
+
+            double amount =
+                    Double.parseDouble(number);
+
+            if (cleaned.endsWith("KB")) {
+                return (long) (amount * 1024);
+            }
+
+            if (cleaned.endsWith("MB")) {
+                return (long) (amount * 1024 * 1024);
+            }
+
+            if (cleaned.endsWith("GB")) {
+                return (long) (amount * 1024 * 1024 * 1024);
+            }
+
+            if (cleaned.endsWith("TB")) {
+                return (long) (amount * 1024 * 1024 * 1024 * 1024);
+            }
+
+            if (cleaned.endsWith("PB")) {
+                return (long) (amount * Math.pow(1024, 5));
+            }
+
+            return (long) amount;
+
+        } catch (Exception ex) {
+            return 0;
+        }
+    }
+
+    private String csv(String value) {
+
+        if (value == null) {
+            return "\"\"";
+        }
+
+        return "\""
+                + value.replace("\"", "\"\"")
+                + "\"";
     }
 
     private JPanel createHistoryPage() {
