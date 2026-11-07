@@ -39,7 +39,7 @@ public class DriveInfo {
     }
 
     public long getUsedSpace() {
-        return totalSpace - freeSpace;
+        return Math.max(0, totalSpace - freeSpace);
     }
 
     public double getUsagePercentage() {
@@ -49,5 +49,77 @@ public class DriveInfo {
         }
 
         return (getUsedSpace() * 100.0) / totalSpace;
+    }
+
+    public long getUnavailableSpace() {
+        return Math.max(0, freeSpace - usableSpace);
+    }
+
+    public boolean isAlmostFull() {
+        return getUsagePercentage() >= 90;
+    }
+
+    public boolean isFull() {
+        return getUsagePercentage() >= 95;
+    }
+
+    public boolean hasAvailableSpace() {
+        return usableSpace > 0;
+    }
+
+    public String getStorageStatus() {
+
+        double usage = getUsagePercentage();
+
+        if (usage >= 95) {
+            return "Critical";
+        }
+
+        if (usage >= 85) {
+            return "Warning";
+        }
+
+        return "Healthy";
+    }
+
+    public String getFormattedUsage() {
+        return String.format("%.1f%%", getUsagePercentage());
+    }
+
+    public String getFormattedTotalSpace() {
+        return formatBytes(totalSpace);
+    }
+
+    public String getFormattedUsedSpace() {
+        return formatBytes(getUsedSpace());
+    }
+
+    public String getFormattedFreeSpace() {
+        return formatBytes(freeSpace);
+    }
+
+    public String getFormattedUsableSpace() {
+        return formatBytes(usableSpace);
+    }
+
+    private String formatBytes(long bytes) {
+
+        if (bytes <= 0) {
+            return "0 B";
+        }
+
+        String[] units = {
+            "B", "KB", "MB", "GB", "TB", "PB"
+        };
+
+        double size = bytes;
+        int unit = 0;
+
+        while (size >= 1024 && unit < units.length - 1) {
+            size /= 1024;
+            unit++;
+        }
+
+        return String.format("%.2f %s", size, units[unit]);
     }
 }
