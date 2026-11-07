@@ -22,10 +22,19 @@ The project is designed to make storage monitoring easier through organized info
 ### Storage Analysis Tools
 - **Drive Analyzer** — Scan a selected folder recursively and inspect its files, sizes, extensions, and modification dates.
 - **Large Files Finder** — Identify the largest files inside a selected directory, displaying up to the 100 largest results.
+- **Large File Search** — Search through scanned results by file name, extension, or location.
+- **File Sorting** — Sort table results using column headers, including numeric file-size sorting.
+- **Open File Location** — Open the containing folder of a selected file directly from the Large Files Finder.
+- **Large Files CSV Export** — Export large-file scan results into a CSV file.
 - **Duplicate Finder** — Detect duplicate files by calculating and comparing SHA-256 content hashes.
 - **Storage Breakdown** — Analyze storage usage by file extension, including file counts, total sizes, and storage percentages.
+- **File Type Analyzer** — Categorize file extensions into Images, Videos, Audio, Documents, Archives, Applications, Code, and Others.
+- **Category Statistics** — Calculate file counts, storage totals, and storage percentages for file categories through the new analysis engine.
 - **File Information** — Display file names, locations, sizes, and other available file details.
+- **Folder Scanner** — Recursively analyze folders, collect file and folder information, identify large files, and track inaccessible items.
 - **Inaccessible File Handling** — Skip files and directories that cannot be accessed during scanning.
+- **Drive Storage Utilities** — Calculate total, used, free, and available storage across detected drives.
+- **Drive Status Detection** — Identify drives that are full or approaching capacity.
 
 ### History and Reporting
 - **Scan History** — Automatically save completed folder scans, including scan date, location, file count, and total size.
@@ -33,15 +42,18 @@ The project is designed to make storage monitoring easier through organized info
 - **History Viewer** — Review previously completed scans through a table.
 - **Report Preview** — View saved scan history in a readable report format.
 - **CSV Export** — Export scan history into an external CSV file.
+- **Large Files Reports** — Export scanned large-file results with file names, extensions, sizes, and locations.
 
 ### Application Settings
 - **Application Settings** — Customize basic application preferences.
 - **Persistent Preferences** — Save settings using Java Preferences.
 - **Refresh Interval Setting** — Configure and save a preferred dashboard refresh interval.
+- **File Location Confirmation** — Enable or disable confirmation prompts before opening file locations.
 
 ### User Interface
 - **Dark User Interface** — Clean, modern interface with a professional charcoal and dark-themed design.
 - **Navigation Sidebar and Workspace** — Access the dashboard, analysis tools, history, reports, and settings through organized navigation.
+- **Interactive Tables** — View, search, and sort file analysis results.
 - **Background Processing** — Perform file analysis without freezing the application interface.
 
 ## Technologies Used
@@ -75,7 +87,8 @@ DiskScope/
                     │
                     ├── analysis/
                     │   ├── AnalysisService.java
-                    │   └── FileRecord.java
+                    │   ├── FileRecord.java
+                    │   └── FileTypeAnalyzer.java
                     │
                     ├── history/
                     │   └── ScanHistoryManager.java
@@ -84,10 +97,12 @@ DiskScope/
                     │   └── DriveInfo.java
                     │
                     ├── scanner/
-                    │   └── DriveScanner.java
+                    │   ├── DriveScanner.java
+                    │   └── FolderScanner.java
                     │
                     ├── ui/
                     │   ├── DashboardPanel.java
+                    │   ├── LargestFilesPanel.java
                     │   ├── Theme.java
                     │   └── WorkspacePanel.java
                     │
@@ -131,9 +146,13 @@ mvn exec:java
 
 DiskScope currently includes its foundational storage monitoring dashboard, automatic drive detection, storage statistics, interactive storage visualization, individual drive usage indicators, manual refresh functionality, and background scanning.
 
-The application has also expanded to include folder analysis, large file detection, SHA-256-based duplicate identification, file type storage breakdowns, persistent scan history, CSV report exporting, and locally saved application preferences.
+The application has also expanded to include folder analysis, large file detection and search, SHA-256-based duplicate identification, file extension storage breakdowns, persistent scan history, CSV report exporting, and locally saved application preferences.
 
-Future improvements may include more advanced storage visualization, scan progress indicators, scan cancellation, folder-level storage analytics, and additional system storage utilities.
+Additional development has introduced a dedicated folder scanning utility, a separate Largest Files interface, improved drive information and storage calculations, and a File Type Analyzer engine for categorizing files by type.
+
+The advanced File Type Analyzer is currently prepared as a separate analysis component, with integration into the Storage Breakdown interface still planned.
+
+Future improvements may include more advanced storage visualization, category-based charts, scan progress indicators, scan cancellation, folder-level storage analytics, and additional system storage utilities.
 
 ## Purpose
 
