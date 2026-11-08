@@ -1,4 +1,3 @@
-
 package com.diskscope.ui;
 
 import com.diskscope.analysis.*;
@@ -94,6 +93,16 @@ public class WorkspacePanel extends JPanel {
         );
 
         tabs.addTab(
+                "Cleanup Recommendations",
+                createCleanupPage()
+        );
+
+        tabs.addTab(
+                "Empty Folder Finder",
+                new EmptyFolderPanel()
+        );
+
+        tabs.addTab(
                 "Scan History",
                 createHistoryPage()
         );
@@ -117,6 +126,10 @@ public class WorkspacePanel extends JPanel {
         DUPLICATES,
         BREAKDOWN
     }
+
+    // ==========================================
+    // GENERAL SCAN PAGES
+    // ==========================================
 
     private JPanel createScanPage(
             String heading,
@@ -156,6 +169,7 @@ public class WorkspacePanel extends JPanel {
 
         // Sort file sizes numerically in the Large Files tab.
         if (mode == Mode.LARGE) {
+
             sorter.setComparator(
                     1,
                     Comparator.comparingLong(
@@ -185,8 +199,11 @@ public class WorkspacePanel extends JPanel {
                                 searchField.getText().trim();
 
                         if (query.isEmpty()) {
+
                             sorter.setRowFilter(null);
+
                         } else {
+
                             sorter.setRowFilter(
                                     RowFilter.regexFilter(
                                             "(?i)" + Pattern.quote(query)
@@ -244,7 +261,10 @@ public class WorkspacePanel extends JPanel {
         page.add(summary);
         page.add(Box.createVerticalStrut(12));
 
-        // Large Files toolbar.
+        // ==========================================
+        // LARGE FILES TOOLBAR
+        // ==========================================
+
         if (mode == Mode.LARGE) {
 
             JPanel toolbar =
@@ -420,6 +440,10 @@ public class WorkspacePanel extends JPanel {
 
         page.add(tableScroll);
 
+        // ==========================================
+        // BROWSE FOLDER
+        // ==========================================
+
         browse.addActionListener(e -> {
 
             JFileChooser chooser =
@@ -438,14 +462,22 @@ public class WorkspacePanel extends JPanel {
             }
         });
 
+        // ==========================================
+        // START SCAN
+        // ==========================================
+
         scan.addActionListener(e -> {
 
             Path selected;
 
             try {
-                selected = Path.of(pathField.getText().trim());
+
+                selected = Path.of(
+                        pathField.getText().trim()
+                );
 
             } catch (Exception ex) {
+
                 error("Enter a valid folder path.");
                 return;
             }
@@ -502,6 +534,7 @@ public class WorkspacePanel extends JPanel {
 
                         List<FileRecord> shown = records;
 
+                        // LARGE FILES
                         if (mode == Mode.LARGE) {
 
                             shown = records.stream()
@@ -514,6 +547,7 @@ public class WorkspacePanel extends JPanel {
                                     .toList();
                         }
 
+                        // DUPLICATE FINDER
                         if (mode == Mode.DUPLICATES) {
 
                             Map<String, List<FileRecord>> groups =
@@ -536,6 +570,10 @@ public class WorkspacePanel extends JPanel {
 
                         // Store the actual displayed results for export.
                         latestRecords.set(List.copyOf(shown));
+
+                        // ==========================================
+                        // STORAGE BREAKDOWN
+                        // ==========================================
 
                         if (mode == Mode.BREAKDOWN) {
 
@@ -582,6 +620,10 @@ public class WorkspacePanel extends JPanel {
 
                         } else {
 
+                            // ==========================================
+                            // DUPLICATE TABLE
+                            // ==========================================
+
                             if (mode == Mode.DUPLICATES) {
 
                                 model.setColumnIdentifiers(
@@ -594,6 +636,10 @@ public class WorkspacePanel extends JPanel {
                                 );
 
                             } else {
+
+                                // ==========================================
+                                // GENERAL AND LARGE FILE TABLE
+                                // ==========================================
 
                                 model.setColumnIdentifiers(
                                         new Object[]{
@@ -677,6 +723,10 @@ public class WorkspacePanel extends JPanel {
         return page;
     }
 
+    // ==========================================
+    // FORMATTED FILE SIZE SORTING
+    // ==========================================
+
     private long parseFormattedBytes(String value) {
 
         if (value == null || value.isBlank()) {
@@ -717,9 +767,14 @@ public class WorkspacePanel extends JPanel {
             return (long) amount;
 
         } catch (Exception ex) {
+
             return 0;
         }
     }
+
+    // ==========================================
+    // CSV HELPER
+    // ==========================================
 
     private String csv(String value) {
 
@@ -731,6 +786,411 @@ public class WorkspacePanel extends JPanel {
                 + value.replace("\"", "\"\"")
                 + "\"";
     }
+
+    // ==========================================
+    // CLEANUP RECOMMENDATIONS
+    // ==========================================
+
+    private JPanel createCleanupPage() {
+
+        JPanel page = basePage();
+
+        CleanupAnalyzer analyzer =
+                new CleanupAnalyzer();
+
+        page.add(title("Cleanup Recommendations"));
+        page.add(Box.createVerticalStrut(5));
+
+        page.add(subtitle(
+                "Identify potentially unnecessary files and review possible storage savings."
+        ));
+
+        page.add(Box.createVerticalStrut(18));
+
+        JTextField pathField =
+                new JTextField(System.getProperty("user.home"));
+
+        styleField(pathField);
+
+        JButton browse = button("Choose Folder");
+        JButton scan = button("Analyze Storage");
+        JButton openLocation = button("Open Location");
+        JButton export = button("Export CSV");
+
+        JLabel status = subtitle(
+                "Choose a folder to find potential cleanup candidates."
+        );
+
+        JLabel summary = subtitle("");
+
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[]{
+                        "File Name",
+                        "Category",
+                        "Size",
+                        "Priority",
+                        "Last Modified",
+                        "Location",
+                        "Reason"
+                },
+                0
+        ) {
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+
+        JTable table = new JTable(model);
+
+        styleTable(table);
+
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        table.getColumnModel().getColumn(0).setPreferredWidth(170);
+        table.getColumnModel().getColumn(1).setPreferredWidth(160);
+        table.getColumnModel().getColumn(2).setPreferredWidth(100);
+        table.getColumnModel().getColumn(3).setPreferredWidth(90);
+        table.getColumnModel().getColumn(4).setPreferredWidth(140);
+        table.getColumnModel().getColumn(5).setPreferredWidth(350);
+        table.getColumnModel().getColumn(6).setPreferredWidth(350);
+
+        JScrollPane scroll = new JScrollPane(table);
+
+        styleScroll(scroll);
+
+        AtomicReference<List<CleanupAnalyzer.Recommendation>>
+                latestRecommendations =
+                new AtomicReference<>(List.of());
+
+        JPanel pathRow = new JPanel(
+                new BorderLayout(8, 0)
+        );
+
+        pathRow.setBackground(Theme.BACKGROUND);
+        pathRow.add(pathField, BorderLayout.CENTER);
+
+        JPanel actions = new JPanel(
+                new FlowLayout(FlowLayout.RIGHT, 8, 0)
+        );
+
+        actions.setBackground(Theme.BACKGROUND);
+        actions.add(browse);
+        actions.add(scan);
+
+        pathRow.add(actions, BorderLayout.EAST);
+
+        JPanel toolbar = new JPanel(
+                new FlowLayout(FlowLayout.LEFT, 8, 0)
+        );
+
+        toolbar.setBackground(Theme.BACKGROUND);
+        toolbar.add(openLocation);
+        toolbar.add(export);
+
+        browse.addActionListener(e -> {
+
+            JFileChooser chooser =
+                    new JFileChooser(pathField.getText());
+
+            chooser.setFileSelectionMode(
+                    JFileChooser.DIRECTORIES_ONLY
+            );
+
+            if (chooser.showOpenDialog(this)
+                    == JFileChooser.APPROVE_OPTION) {
+
+                pathField.setText(
+                        chooser.getSelectedFile().getAbsolutePath()
+                );
+            }
+        });
+
+        // ==========================================
+        // ANALYZE STORAGE
+        // ==========================================
+
+        scan.addActionListener(e -> {
+
+            Path selected;
+
+            try {
+
+                selected = Path.of(
+                        pathField.getText().trim()
+                );
+
+            } catch (Exception ex) {
+
+                error("Enter a valid folder path.");
+                return;
+            }
+
+            if (!Files.isDirectory(selected)
+                    || !Files.isReadable(selected)) {
+
+                error("The selected folder is not accessible.");
+                return;
+            }
+
+            scan.setEnabled(false);
+            browse.setEnabled(false);
+            scan.setText("Analyzing...");
+
+            status.setText(
+                    "Scanning files and checking cleanup candidates..."
+            );
+
+            summary.setText("");
+
+            model.setRowCount(0);
+            latestRecommendations.set(List.of());
+
+            new SwingWorker<List<CleanupAnalyzer.Recommendation>, Void>() {
+
+                @Override
+                protected List<CleanupAnalyzer.Recommendation>
+                doInBackground() throws Exception {
+
+                    List<FileRecord> records = service.scan(
+                            selected,
+                            false,
+                            new AtomicLong()
+                    );
+
+                    return analyzer.analyze(records);
+                }
+
+                @Override
+                protected void done() {
+
+                    try {
+
+                        List<CleanupAnalyzer.Recommendation>
+                                recommendations = get();
+
+                        latestRecommendations.set(
+                                List.copyOf(recommendations)
+                        );
+
+                        long totalSavings = recommendations.stream()
+                                .mapToLong(
+                                        CleanupAnalyzer.Recommendation::reclaimableBytes
+                                )
+                                .sum();
+
+                        for (CleanupAnalyzer.Recommendation recommendation
+                                : recommendations) {
+
+                            FileRecord record =
+                                    recommendation.file();
+
+                            String modified =
+                                    record.modified() == null
+                                            ? "Unknown"
+                                            : DateTimeFormatter
+                                                    .ofPattern("yyyy-MM-dd HH:mm")
+                                                    .withZone(ZoneId.systemDefault())
+                                                    .format(record.modified());
+
+                            model.addRow(new Object[]{
+                                    record.fileName(),
+                                    recommendation.category(),
+                                    FormatUtils.formatBytes(record.size()),
+                                    recommendation.priority(),
+                                    modified,
+                                    record.path().toString(),
+                                    recommendation.reason()
+                            });
+                        }
+
+                        summary.setText(
+                                "Candidates: " + recommendations.size()
+                                + "   •   Potential storage savings: "
+                                + FormatUtils.formatBytes(totalSavings)
+                        );
+
+                        status.setText(
+                                recommendations.isEmpty()
+                                        ? "Analysis completed. No cleanup candidates were found."
+                                        : "Analysis completed successfully. Review the results before taking action."
+                        );
+
+                    } catch (Exception ex) {
+
+                        status.setText(
+                                "Analysis failed: " + ex.getMessage()
+                        );
+
+                    } finally {
+
+                        scan.setEnabled(true);
+                        browse.setEnabled(true);
+                        scan.setText("Analyze Storage");
+                    }
+                }
+
+            }.execute();
+        });
+
+        // ==========================================
+        // OPEN FILE LOCATION
+        // ==========================================
+
+        openLocation.addActionListener(e -> {
+
+            int selectedRow =
+                    table.getSelectedRow();
+
+            if (selectedRow < 0) {
+                error("Select a file from the table first.");
+                return;
+            }
+
+            String location = String.valueOf(
+                    model.getValueAt(selectedRow, 5)
+            );
+
+            try {
+
+                Path file = Path.of(location);
+                Path parent = file.getParent();
+
+                if (parent == null || !Files.exists(parent)) {
+                    error("The file location could not be found.");
+                    return;
+                }
+
+                if (!Desktop.isDesktopSupported()) {
+                    error("Opening file locations is not supported.");
+                    return;
+                }
+
+                if (prefs.getBoolean("confirmOpen", true)) {
+
+                    int choice = JOptionPane.showConfirmDialog(
+                            this,
+                            "Open this file's containing folder?\n\n" + parent,
+                            "Open File Location",
+                            JOptionPane.YES_NO_OPTION
+                    );
+
+                    if (choice != JOptionPane.YES_OPTION) {
+                        return;
+                    }
+                }
+
+                Desktop.getDesktop().open(parent.toFile());
+
+            } catch (Exception ex) {
+
+                error(
+                        "Could not open file location: "
+                                + ex.getMessage()
+                );
+            }
+        });
+
+        // ==========================================
+        // EXPORT CLEANUP RESULTS
+        // ==========================================
+
+        export.addActionListener(e -> {
+
+            List<CleanupAnalyzer.Recommendation> recommendations =
+                    latestRecommendations.get();
+
+            if (recommendations.isEmpty()) {
+                error("Analyze a folder before exporting recommendations.");
+                return;
+            }
+
+            JFileChooser chooser = new JFileChooser();
+
+            chooser.setDialogTitle(
+                    "Export Cleanup Recommendations"
+            );
+
+            chooser.setSelectedFile(
+                    new File("DiskScope-Cleanup-Recommendations.csv")
+            );
+
+            if (chooser.showSaveDialog(this)
+                    != JFileChooser.APPROVE_OPTION) {
+                return;
+            }
+
+            Path destination =
+                    chooser.getSelectedFile().toPath();
+
+            try (
+                    BufferedWriter writer = Files.newBufferedWriter(
+                            destination,
+                            StandardCharsets.UTF_8
+                    )
+            ) {
+
+                writer.write(
+                        "File Name,Category,Size (Bytes),Priority,Last Modified,Location,Reason"
+                );
+
+                writer.newLine();
+
+                for (CleanupAnalyzer.Recommendation recommendation
+                        : recommendations) {
+
+                    FileRecord record =
+                            recommendation.file();
+
+                    writer.write(
+                            csv(record.fileName()) + ","
+                            + csv(recommendation.category()) + ","
+                            + record.size() + ","
+                            + csv(recommendation.priority()) + ","
+                            + csv(record.modified() == null
+                                    ? "Unknown"
+                                    : record.modified().toString()) + ","
+                            + csv(record.path().toString()) + ","
+                            + csv(recommendation.reason())
+                    );
+
+                    writer.newLine();
+                }
+
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Cleanup recommendations exported successfully.\n\n"
+                                + destination,
+                        "DiskScope",
+                        JOptionPane.INFORMATION_MESSAGE
+                );
+
+            } catch (IOException ex) {
+
+                error(
+                        "Could not export recommendations: "
+                                + ex.getMessage()
+                );
+            }
+        });
+
+        page.add(pathRow);
+        page.add(Box.createVerticalStrut(12));
+        page.add(status);
+        page.add(Box.createVerticalStrut(5));
+        page.add(summary);
+        page.add(Box.createVerticalStrut(12));
+        page.add(toolbar);
+        page.add(Box.createVerticalStrut(10));
+        page.add(scroll);
+
+        return page;
+    }
+
+    // ==========================================
+    // SCAN HISTORY
+    // ==========================================
 
     private JPanel createHistoryPage() {
 
@@ -806,6 +1266,10 @@ public class WorkspacePanel extends JPanel {
         }
     }
 
+    // ==========================================
+    // REPORTS
+    // ==========================================
+
     private JPanel createReportsPage() {
 
         JPanel page = basePage();
@@ -822,6 +1286,7 @@ public class WorkspacePanel extends JPanel {
         reportArea.setEditable(false);
         reportArea.setBackground(Theme.PANEL);
         reportArea.setForeground(Theme.TEXT);
+
         reportArea.setFont(
                 new Font("Consolas", Font.PLAIN, 12)
         );
@@ -897,6 +1362,10 @@ public class WorkspacePanel extends JPanel {
         return page;
     }
 
+    // ==========================================
+    // SETTINGS
+    // ==========================================
+
     private JPanel createSettingsPage() {
 
         JPanel page = basePage();
@@ -969,6 +1438,10 @@ public class WorkspacePanel extends JPanel {
 
         return page;
     }
+
+    // ==========================================
+    // UI HELPERS
+    // ==========================================
 
     private JPanel basePage() {
 
